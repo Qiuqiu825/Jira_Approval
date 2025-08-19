@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira 审批工具</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            margin: 20px auto;
+            max-width: 1200px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 20px 20px 0 0;
+            text-align: center;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .form-control, .btn {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .issue-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+            margin-bottom: 15px;
+            border: 1px solid #f8f9fa;
+            transition: all 0.3s ease;
+        }
+        
+        .issue-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .issue-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 15px 20px;
+            border-radius: 15px 15px 0 0;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .issue-body {
+            padding: 15px 20px;
+        }
+        
+        .status-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-open { background-color: #d4edda; color: #155724; }
+        .status-in-progress { background-color: #fff3cd; color: #856404; }
+        .status-done { background-color: #cce5ff; color: #004085; }
+        
+        .risk-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .risk-low { background-color: #d4edda; color: #155724; }
+        .risk-medium { background-color: #fff3cd; color: #856404; }
+        .risk-high { background-color: #f8d7da; color: #721c24; }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+        
+        .modal-content {
+            border-radius: 15px;
+            border: none;
+        }
+        
+        .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0;
+        }
+        
+        .description-content {
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            font-size: 0.9rem;
+        }
+        
+        .checkbox-custom {
+            transform: scale(1.2);
+            margin-right: 10px;
+        }
+        
+        .approval-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .approval-result {
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        .approval-result.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .approval-result.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <div class="header">
+                <h1><i class="fas fa-check-circle me-3"></i>Jira 审批工具</h1>
+                <p class="mb-0">批量处理 Jira tickets 的审批流程</p>
+            </div>
+            
+            <div class="content">
+                <!-- 输入区域 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-link me-2"></i>输入 Jira 链接</h5>
+                                <div class="mb-3">
+                                    <label for="jiraLinks" class="form-label">请输入 Jira ticket 链接（每行一个）：</label>
+                                    <textarea class="form-control" id="jiraLinks" rows="5" 
+                                              placeholder="例如：&#10;https://jira.shopee.io/browse/SPSK-123456&#10;https://casement.scredit.io/jira?jiraKey=SPSK-789012&#10;SPSK-345678"></textarea>
+                                </div>
+                                <button type="button" class="btn btn-primary" onclick="processLinks()">
+                                    <i class="fas fa-search me-2"></i>获取 Ticket 信息
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 加载状态 -->
+                <div id="loading" class="loading">
+                    <div class="spinner"></div>
+                    <p>正在获取 Jira tickets 信息...</p>
+                </div>
+                
+                <!-- 错误提示 -->
+                <div id="errorAlert" class="alert alert-danger" style="display: none;">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span id="errorMessage"></span>
+                </div>
+                
+                <!-- Tickets 显示区域 -->
+                <div id="issuesContainer" style="display: none;">
+                    <div class="row">
+                        <div class="col-12">
+                            <h4><i class="fas fa-list me-2"></i>Tickets 列表</h4>
+                            <div id="issuesList"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 审批操作区域 -->
+                    <div id="approvalSection" class="approval-section" style="display: none;">
+                        <h5><i class="fas fa-check-double me-2"></i>审批操作</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <button type="button" class="btn btn-success me-2" onclick="approveSelected()" id="approveSelectedBtn">
+                                    <i class="fas fa-check me-2"></i>审批选中项
+                                </button>
+                                <button type="button" class="btn btn-info" onclick="approveAll()" id="approveAllBtn">
+                                    <i class="fas fa-check-double me-2"></i>审批全部
+                                </button>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <button type="button" class="btn btn-secondary" onclick="clearSelection()">
+                                    <i class="fas fa-times me-2"></i>清除选择
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 审批Loading状态 -->
+                        <div id="approvalLoading" class="text-center mt-3" style="display: none;">
+                            <div class="spinner" style="width: 30px; height: 30px; border-width: 3px;"></div>
+                            <p class="mt-2 mb-0">正在审批中，请稍候...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 审批Summary区域 -->
+                    <div id="approvalSummary" class="mt-4" style="display: none;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>审批结果汇总</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="summaryContent"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 描述模态框 -->
+    <div class="modal fade" id="descriptionModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-file-alt me-2"></i>Ticket 描述</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="descriptionContent" class="description-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Risk URL 模态框 -->
+    <div class="modal fade" id="riskUrlModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Risk Register URL</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>此 ticket 的 Financial Risk 不是 Low，请输入 Risk Register URL：</p>
+                    <input type="url" class="form-control" id="riskUrlInput" placeholder="https://...">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmRiskUrl()">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentIssues = [];
+        let pendingRiskUrl = null;
+        let pendingApprovalIssues = [];
+        
+        function processLinks() {
+            const linksText = document.getElementById('jiraLinks').value;
+            if (!linksText.trim()) {
+                showError('请输入至少一个 Jira 链接');
+                return;
+            }
+            
+            const links = linksText.split('\n').filter(link => link.trim());
+            
+            showLoading(true);
+            hideError();
+            
+            fetch('/api/process_links', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ links: links })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showLoading(false);
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    currentIssues = data.issues;
+                    displayIssues(data.issues);
+                }
+            })
+            .catch(error => {
+                showLoading(false);
+                showError('处理链接时发生错误: ' + error.message);
+            });
+        }
+        
+        function displayIssues(issues) {
+            const container = document.getElementById('issuesContainer');
+            const list = document.getElementById('issuesList');
+            
+            if (issues.length === 0) {
+                list.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>未找到有效的 Jira tickets</div>';
+                container.style.display = 'block';
+                return;
+            }
+            
+            let html = '';
+            issues.forEach((issue, index) => {
+                const statusClass = getStatusClass(issue.status);
+                const riskClass = getRiskClass(issue.financial_risk);
+                
+                html += `
+                    <div class="issue-card">
+                        <div class="issue-header">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <div class="d-flex align-items-center">
+                                        <input type="checkbox" class="form-check-input checkbox-custom me-2" 
+                                               id="issue_${index}" onchange="updateApprovalSection()">
+                                        <div>
+                                            <div class="d-flex align-items-center">
+                                                <span style="color: #6c757d; font-weight: normal; font-size: 0.9rem;">${issue.key}</span>
+                                            </div>
+                                            <p class="mb-0 mt-1" style="color: #2c3e50; font-size: 1rem; font-weight: 600; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 8px 12px; border-radius: 6px; border-left: 4px solid #667eea;">${issue.title}</p>
+                                            <div class="d-flex align-items-center mt-1">
+                                                <small style="color: #000;">报告人: ${issue.reporter}</small>
+                                                <span style="color: #000; font-size: 0.85rem;" class="ms-3">${issue.status}</span>
+                                                <span style="color: #000; font-size: 0.85rem;" class="mx-2">|</span>
+                                                <span style="color: #000; font-size: 0.85rem;">${issue.financial_risk}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-2" onclick="openConfluenceLinks('${issue.key}', ${index})" id="confluence_btn_${index}" style="display: none;">
+                                        <i class="fas fa-book me-1"></i>打开 Confluence
+                                    </button>
+                                    <a href="${issue.link}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-external-link-alt me-1"></i>打开 Jira
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="issue-body">
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="description-content" id="description_${index}" style="max-height: 200px; overflow-y: auto;">
+                                        <div class="text-center">
+                                            <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                                            <small class="text-muted">加载描述中...</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-12">
+                                    <div id="approval_result_${index}" class="approval-result" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html;
+            container.style.display = 'block';
+            updateApprovalSection();
+            
+            // 自动加载所有ticket的描述
+            issues.forEach((issue, index) => {
+                loadDescription(issue.key, index);
+            });
+        }
+        
+        function getStatusClass(status) {
+            const statusLower = status.toLowerCase();
+            if (statusLower.includes('open')) return 'status-open';
+            if (statusLower.includes('progress')) return 'status-in-progress';
+            if (statusLower.includes('done') || statusLower.includes('closed')) return 'status-done';
+            return 'status-open';
+        }
+        
+        function getRiskClass(risk) {
+            const riskLower = risk.toLowerCase();
+            if (riskLower === 'low') return 'risk-low';
+            if (riskLower === 'medium') return 'risk-medium';
+            if (riskLower === 'high') return 'risk-high';
+            return 'risk-low';
+        }
+        
+        function updateApprovalSection() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+            const approvalSection = document.getElementById('approvalSection');
+            
+            // 只要有tickets就显示审批按钮
+            if (currentIssues.length > 0) {
+                approvalSection.style.display = 'block';
+            } else {
+                approvalSection.style.display = 'none';
+            }
+        }
+        
+        function loadDescription(issueKey, index) {
+            fetch('/api/get_description', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ issue_key: issueKey })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const descriptionElement = document.getElementById(`description_${index}`);
+                if (data.error) {
+                    descriptionElement.innerHTML = '<div class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>加载描述失败</div>';
+                } else {
+                    descriptionElement.textContent = data.description || '无描述';
+                }
+            })
+            .catch(error => {
+                const descriptionElement = document.getElementById(`description_${index}`);
+                descriptionElement.innerHTML = '<div class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>加载描述失败</div>';
+            });
+            
+            // 同时检查是否有Confluence链接
+            checkConfluenceLinks(issueKey, index);
+        }
+        
+        function checkConfluenceLinks(issueKey, index) {
+            fetch('/api/get_confluence_links', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ issue_key: issueKey })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const confluenceBtn = document.getElementById(`confluence_btn_${index}`);
+                // 检查是否有有效的Confluence链接（排除空值、null、undefined、'NONE'等）
+                if (data.confluence_links && 
+                    data.confluence_links.length > 0 && 
+                    data.confluence_links[0] && 
+                    data.confluence_links[0] !== 'NONE' && 
+                    data.confluence_links[0].trim() !== '') {
+                    confluenceBtn.style.display = 'inline-block';
+                    confluenceBtn.setAttribute('data-links', JSON.stringify(data.confluence_links));
+                } else {
+                    confluenceBtn.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.log('检查Confluence链接时发生错误:', error);
+                const confluenceBtn = document.getElementById(`confluence_btn_${index}`);
+                confluenceBtn.style.display = 'none';
+            });
+        }
+        
+        function openConfluenceLinks(issueKey, index) {
+            const confluenceBtn = document.getElementById(`confluence_btn_${index}`);
+            const links = JSON.parse(confluenceBtn.getAttribute('data-links') || '[]');
+            
+            if (links.length === 1) {
+                // 只有一个链接，直接打开
+                window.open(links[0], '_blank');
+            } else if (links.length > 1) {
+                // 多个链接，显示选择对话框
+                let linkList = '';
+                links.forEach((link, i) => {
+                    linkList += `<a href="${link}" target="_blank" class="btn btn-sm btn-outline-info me-2 mb-2">链接 ${i + 1}</a>`;
+                });
+                
+                const modal = new bootstrap.Modal(document.getElementById('descriptionModal'));
+                document.getElementById('descriptionContent').innerHTML = `
+                    <h6>选择要打开的 Confluence 链接：</h6>
+                    <div class="mt-3">
+                        ${linkList}
+                    </div>
+                `;
+                modal.show();
+            }
+        }
+        
+        function viewDescription(issueKey) {
+            showLoading(true);
+            
+            fetch('/api/get_description', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ issue_key: issueKey })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showLoading(false);
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    document.getElementById('descriptionContent').textContent = data.description;
+                    new bootstrap.Modal(document.getElementById('descriptionModal')).show();
+                }
+            })
+            .catch(error => {
+                showLoading(false);
+                showError('获取描述时发生错误: ' + error.message);
+            });
+        }
+        
+        function approveSelected() {
+            const selectedIssues = getSelectedIssues();
+            if (selectedIssues.length === 0) {
+                showError('请选择要审批的 tickets');
+                return;
+            }
+            
+            approveIssues(selectedIssues);
+        }
+        
+        function approveAll() {
+            if (currentIssues.length === 0) {
+                showError('没有可审批的 tickets');
+                return;
+            }
+            
+            approveIssues(currentIssues);
+        }
+        
+        function approveIssues(issues) {
+            // 检查是否有需要 Risk URL 的 tickets
+            const needsRiskUrl = issues.filter(issue => 
+                issue.financial_risk.toLowerCase() !== 'low'
+            );
+            
+            if (needsRiskUrl.length > 0) {
+                pendingApprovalIssues = issues;
+                document.getElementById('riskUrlInput').value = '';
+                new bootstrap.Modal(document.getElementById('riskUrlModal')).show();
+            } else {
+                performApproval(issues, {});
+            }
+        }
+        
+        function confirmRiskUrl() {
+            const riskUrl = document.getElementById('riskUrlInput').value.trim();
+            if (!riskUrl) {
+                showError('请输入 Risk Register URL');
+                return;
+            }
+            
+            const riskUrls = {};
+            pendingApprovalIssues.forEach(issue => {
+                if (issue.financial_risk.toLowerCase() !== 'low') {
+                    riskUrls[issue.key] = riskUrl;
+                }
+            });
+            
+            bootstrap.Modal.getInstance(document.getElementById('riskUrlModal')).hide();
+            performApproval(pendingApprovalIssues, riskUrls);
+        }
+        
+        function performApproval(issues, riskUrls) {
+            // 显示审批Loading状态
+            document.getElementById('approvalLoading').style.display = 'block';
+            document.getElementById('approveSelectedBtn').disabled = true;
+            document.getElementById('approveAllBtn').disabled = true;
+            
+            fetch('/api/approve_issues', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    issues: issues,
+                    risk_urls: riskUrls
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 隐藏审批Loading状态
+                document.getElementById('approvalLoading').style.display = 'none';
+                document.getElementById('approveSelectedBtn').disabled = false;
+                document.getElementById('approveAllBtn').disabled = false;
+                
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    showResults(data.results);
+                    showSummary(data.results);
+                }
+            })
+            .catch(error => {
+                // 隐藏审批Loading状态
+                document.getElementById('approvalLoading').style.display = 'none';
+                document.getElementById('approveSelectedBtn').disabled = false;
+                document.getElementById('approveAllBtn').disabled = false;
+                showError('审批时发生错误: ' + error.message);
+            });
+        }
+        
+        function showResults(results) {
+            // 清除之前的结果
+            currentIssues.forEach((issue, index) => {
+                const resultElement = document.getElementById(`approval_result_${index}`);
+                if (resultElement) {
+                    resultElement.style.display = 'none';
+                }
+            });
+            
+            // 显示新的结果
+            results.forEach(result => {
+                const issueIndex = currentIssues.findIndex(issue => issue.key === result.key);
+                if (issueIndex !== -1) {
+                    const resultElement = document.getElementById(`approval_result_${issueIndex}`);
+                    if (resultElement) {
+                        const icon = result.success ? 'fas fa-check-circle' : 'fas fa-times-circle';
+                        const status = result.success ? '成功' : '失败';
+                        const className = result.success ? 'success' : 'error';
+                        
+                        resultElement.innerHTML = `
+                            <i class="${icon} me-2"></i>
+                            <strong>审批${status}</strong>: ${result.message}
+                        `;
+                        resultElement.className = `approval-result ${className}`;
+                        resultElement.style.display = 'block';
+                    }
+                }
+            });
+        }
+        
+        function showSummary(results) {
+            const summaryElement = document.getElementById('approvalSummary');
+            const summaryContent = document.getElementById('summaryContent');
+            
+            const successCount = results.filter(r => r.success).length;
+            const failureCount = results.filter(r => !r.success).length;
+            const totalCount = results.length;
+            
+            let summaryHtml = `
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h4 class="text-success">${successCount}</h4>
+                            <small class="text-muted">审批成功</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h4 class="text-danger">${failureCount}</h4>
+                            <small class="text-muted">审批失败</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h4 class="text-primary">${totalCount}</h4>
+                            <small class="text-muted">总计</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 如果有失败的tickets，显示详细信息
+            if (failureCount > 0) {
+                const failedIssues = results.filter(r => !r.success);
+                summaryHtml += `
+                    <hr>
+                    <h6 class="text-danger mb-3"><i class="fas fa-exclamation-triangle me-1"></i>失败的 Tickets:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Ticket</th>
+                                    <th>标题</th>
+                                    <th>失败原因</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                failedIssues.forEach(result => {
+                    const issue = currentIssues.find(i => i.key === result.key);
+                    if (issue) {
+                        summaryHtml += `
+                            <tr>
+                                <td><code>${result.key}</code></td>
+                                <td>${issue.title}</td>
+                                <td><span class="text-danger">${result.message}</span></td>
+                                <td>
+                                    <a href="${issue.link}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-external-link-alt me-1"></i>打开
+                                    </a>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+                
+                summaryHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            summaryContent.innerHTML = summaryHtml;
+            summaryElement.style.display = 'block';
+        }
+        
+        function getSelectedIssues() {
+            const selectedIssues = [];
+            currentIssues.forEach((issue, index) => {
+                const checkbox = document.getElementById(`issue_${index}`);
+                if (checkbox && checkbox.checked) {
+                    selectedIssues.push(issue);
+                }
+            });
+            return selectedIssues;
+        }
+        
+        function clearSelection() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(checkbox => checkbox.checked = false);
+            updateApprovalSection();
+        }
+        
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+        
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorAlert').style.display = 'block';
+        }
+        
+        function hideError() {
+            document.getElementById('errorAlert').style.display = 'none';
+        }
+    </script>
+</body>
+</html> 
